@@ -1,20 +1,24 @@
 import math
 import pyxel
+import json
 
 class ZumaTowerDefenceModel:
     def __init__(self):
+        with open('settings.json', 'r') as file:
+            self._data = json.load(file)
+
         # game
         self._current_round: int = 0
-        self._rounds: int = 1
+        self._rounds: int = self._data["rounds"]
         self._score = 0
         
         # player
-        self._player_lives: int = 2
+        self._player_lives: int = self._data["player-lives"]
 
         # enemy
-        self._enemy_count: int = 5
+        self._enemy_count: int = self._data["enemies-per-round"]
         self._enemies_spawned: int = 0
-        self._enemy_path: list = [0, 1, 17, 33] # 0 is reserved for -15, offscreen spawning
+        self._enemy_path: list = [0, 1, 17, 33, 49, 50, 51, 52, 53, 37, 21, 22, 23, 24] # 0 is reserved for -15, offscreen spawning
         self._enemies: list[Enemy | None] = [None] * len(self._enemy_path)
         self._enemy_coords = {}
         
@@ -31,6 +35,15 @@ class ZumaTowerDefenceModel:
     def is_game_over(self) -> bool:
         return (self.rounds == self.current_round) or \
                 (self._player_lives == 0)
+    
+    @property
+    def is_round_over(self) -> bool:
+        round_over = all(enemy is None for enemy in self._enemies)
+        if round_over and self._enemies_spawned == self._enemy_count:
+            self._enemies_spawned = 0
+            self._current_round += 1
+            return True
+        return False
     
     @property
     def rounds(self) -> int:

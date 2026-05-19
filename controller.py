@@ -27,6 +27,8 @@ class ZumaTowerDefenceController:
             model.reduce_player_lives()
 
             model.update_enemies()
+
+            model.is_round_over
         
     def draw(self):
         model = self._model
@@ -45,4 +47,6 @@ class ZumaTowerDefenceController:
         view.draw_score(str(model.score))
 
         view.draw_hearts(model.player_lives)
+
+        view.draw_rounds(model.current_round)
 

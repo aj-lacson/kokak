@@ -1,0 +1,5 @@
+{
+ "player-lives":   2,
+ "rounds": 2, 
+ "enemies-per-round": 5
+}

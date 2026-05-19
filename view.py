@@ -40,7 +40,10 @@ class ZumaTowerDefenceView:
         pyxel.text(215, 240, f"EXP: {score}", 2)
         
     def draw_hearts(self, hearts):
-        pyxel.text(215, 220, f"Hearts: {hearts}", 2)
+        pyxel.text(215, 230, f"Hearts: {hearts}", 2)
+    
+    def draw_rounds(self, round):
+        pyxel.text(215, 220, f"Rounds: {round}", 2)
 
     def draw_paths(self, enemy_coords, enemy_path):
         x_coord_extra = 0
