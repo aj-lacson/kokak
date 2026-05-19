@@ -13,13 +13,17 @@ class ZumaTowerDefenceModel:
 
         # enemy
         self._enemy_count: int = 5
-        self._enemies: list[Enemy] = []
         self._enemies_spawned: int = 0
+        self._enemy_path: list = [0, 1, 17, 33] # 0 is reserved for -15, offscreen spawning
+        self._enemies: list[Enemy | None] = [None] * len(self._enemy_path)
+        self._enemy_coords = {}
         
         # bullet
         self._bullets: list[Bullet] = []
         self._bullet_speed = 5
         self._last_bullet_shot: int = 0
+
+        self.tile_number_generator()
     
     '''# game properties and methods'''
 
@@ -43,6 +47,15 @@ class ZumaTowerDefenceModel:
     def add_score(self):
         self._score += 1
     
+    def tile_number_generator(self):
+        tile_size = 16 # please change it to whatever max size screen (one side) you have divided by 16
+        tile_number = 0
+
+        for y in range(1, 256, tile_size):
+            for x in range(-15 if tile_number == 0 else 1, 256, tile_size):
+                self._enemy_coords[tile_number] = (x, y)
+                tile_number += 1
+    
     '''# player properties and methods'''
 
     @property
@@ -51,9 +64,9 @@ class ZumaTowerDefenceModel:
 
     def reduce_player_lives(self):
         for enemy in self._enemies:
-            if enemy.x >= 261: # pag lumabas sa screen enemy kasi wala pang way to approach yung enemy to center, 261 yung edge
+            if enemy and self._enemy_path[enemy.path_idx] == self._enemy_path[-1]: # Once reach the last cell of the path, we lose a heart
                 self._player_lives -= 1
-                self._enemies.remove(enemy)
+                self._enemies[enemy.path_idx] = None
                 break
     
     '''# enemy properties and methods'''
@@ -70,27 +83,44 @@ class ZumaTowerDefenceModel:
     def enemies_spawned(self):
         return self._enemies_spawned
     
+    @property
+    def enemy_path(self):
+        return self._enemy_path
+    
+    @property
+    def enemy_coords(self):
+        return self._enemy_coords
+    
     def append_enemy(self):
-        if (not self._enemies or self._enemies[-1].x > 0) and \
-            self._enemies_spawned < self._enemy_count: # yung 15 rito sa taas is yung nagseset sa pagspawn ng next enemy
-            
-            self._enemies.append(Enemy())
+        if self._enemies[0] is None and \
+            self._enemies_spawned < self._enemy_count:
+
+            self._enemies[0] = Enemy(self._enemy_coords, self._enemy_path)
             self._enemies_spawned += 1
     
     def kill_enemy(self):
+        
         for enemy in self._enemies:
-            for bullet in self._bullets:
-                if (enemy.x <= bullet._current_x <= enemy.x + enemy.side) and \
-                    (enemy.y <= bullet._current_y <= enemy.y + enemy.side): # update this so that yung hitbox ng bullet mismo yung tumatama, di lang center
-                    
-                    self.add_score()
-                    
-                    self._enemies.remove(enemy)
-                    self._bullets.remove(bullet)
+            if enemy:
+                enemy_x = enemy.x
+                enemy_y = enemy.y
+                for bullet in self._bullets:
+                    if (enemy_x <= bullet._current_x <= enemy_x + enemy.side) and \
+                        (enemy_y <= bullet._current_y <= enemy_y + enemy.side): # update this so that yung hitbox ng bullet mismo yung tumatama, di lang center
+                        
+                        self.add_score()
+                        
+                        self._enemies[enemy.path_idx] = None
+                        self._bullets.remove(bullet)
     
     def update_enemies(self):
+        new_enemies: list[Enemy | None] = [None] * len(self._enemies)
         for enemy in self._enemies:
-            enemy.update()
+            if enemy:
+                enemy.update()
+                if enemy.path_idx < len(self._enemy_path):
+                    new_enemies[enemy.path_idx] = enemy
+        self._enemies = new_enemies
     
     '''# bullet properties and methods'''
 
@@ -150,26 +180,32 @@ class Bullet:
         return 0 <= self._current_x <= 261 or 0 <= self._current_y <= 261 # 261 para off screen mawala
 
 class Enemy:
-    def __init__(self):       
-        self._current_x = -15 # offscreen tau spawn :))
-        self._current_y = 5
-
+    def __init__(self, enemy_coords, enemy_path):       
+        self._enemy_path_idx = 0
         self._side = 15
+        self._enemy_coords = enemy_coords
+        self._enemy_path = enemy_path
 
         # color can be added here
     
     @property
+    def path_idx(self) -> int:
+        return self._enemy_path_idx
+    
+    @property
     def x(self):
-        return self._current_x
+        tile_number = self._enemy_path[self._enemy_path_idx]
+        return self._enemy_coords[tile_number][0]
     
     @property
     def y(self):
-        return self._current_y
+        tile_number = self._enemy_path[self._enemy_path_idx]
+        return self._enemy_coords[tile_number][1]
 
     @property
     def side(self):
         return self._side
 
     def update(self):
-        if pyxel.frame_count % 60 == 0:
-            self._current_x += 16 # 16 muna pixel size nang tile, pede sya mabago
+        if not pyxel.frame_count == 0 and pyxel.frame_count % 60 == 0:
+            self._enemy_path_idx += 1
