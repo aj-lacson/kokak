@@ -23,17 +23,17 @@ class ZumaTowerDefenceView:
         return pyxel.btnp(pyxel.MOUSE_BUTTON_LEFT)
     
     '''# entities'''
-    def draw_player(self):
-        pyxel.circ(128, 128, 10, 1)
+    def draw_player(self, bullet_color):
+        pyxel.circ(128, 128, 10, bullet_color)
         
     def draw_bullet(self, bullets):
         for bullet in bullets:
-            pyxel.circ(int(bullet.bullet_x), int(bullet.bullet_y), 5, 3)
+            pyxel.circ(int(bullet.bullet_x), int(bullet.bullet_y), 5, bullet.color)
     
     def draw_enemy(self, enemies):
         for enemy in enemies:
             if enemy:
-                pyxel.rect(int(enemy.x), int(enemy.y), int(enemy.side), int(enemy.side), 3)
+                pyxel.rect(int(enemy.x), int(enemy.y), int(enemy.side), int(enemy.side), enemy.color)
     
     '''# game environment'''
     def draw_score(self, score: str):

@@ -40,7 +40,7 @@ class ZumaTowerDefenceController:
 
         view.draw_bullet(model.bullets)
 
-        view.draw_player()
+        view.draw_player(model.next_bullet_color)
 
         view.draw_enemy(model.enemies)
 

@@ -1,9 +1,10 @@
 import math
 import pyxel
 import json
+from random import Random
 
 class ZumaTowerDefenceModel:
-    def __init__(self):
+    def __init__(self, rng: Random):
         with open('settings.json', 'r') as file:
             self._data = json.load(file)
 
@@ -11,6 +12,7 @@ class ZumaTowerDefenceModel:
         self._current_round: int = 0
         self._rounds: int = self._data["rounds"]
         self._score = 0
+        self._rng = rng
         
         # player
         self._player_lives: int = self._data["player-lives"]
@@ -24,8 +26,8 @@ class ZumaTowerDefenceModel:
         
         # bullet
         self._bullets: list[Bullet] = []
-        self._bullet_speed = 5
         self._last_bullet_shot: int = 0
+        self._next_bullet_color= self._rng.randint(14, 16)
 
         self.tile_number_generator()
     
@@ -74,6 +76,10 @@ class ZumaTowerDefenceModel:
     @property
     def player_lives(self):
         return self._player_lives
+    
+    @property
+    def next_bullet_color(self):
+        return self._next_bullet_color
 
     def reduce_player_lives(self):
         for enemy in self._enemies:
@@ -81,6 +87,7 @@ class ZumaTowerDefenceModel:
                 self._player_lives -= 1
                 self._enemies[enemy.path_idx] = None
                 break
+    
     
     '''# enemy properties and methods'''
     
@@ -108,23 +115,26 @@ class ZumaTowerDefenceModel:
         if self._enemies[0] is None and \
             self._enemies_spawned < self._enemy_count:
 
-            self._enemies[0] = Enemy(self._enemy_coords, self._enemy_path)
+            self._enemies[0] = Enemy(self._enemy_coords, self._enemy_path, self._rng.randint(14, 16))
             self._enemies_spawned += 1
     
     def kill_enemy(self):
         
         for enemy in self._enemies:
-            if enemy:
-                enemy_x = enemy.x
-                enemy_y = enemy.y
-                for bullet in self._bullets:
-                    if (enemy_x <= bullet._current_x <= enemy_x + enemy.side) and \
-                        (enemy_y <= bullet._current_y <= enemy_y + enemy.side): # update this so that yung hitbox ng bullet mismo yung tumatama, di lang center
-                        
-                        self.add_score()
-                        
+            if not enemy:
+                continue
+            enemy_x = enemy.x
+            enemy_y = enemy.y
+            
+            for bullet in self._bullets:
+                if (enemy_x <= bullet._current_x <= enemy_x + enemy.side) and \
+                   (enemy_y <= bullet._current_y <= enemy_y + enemy.side): # update this so that yung hitbox ng bullet mismo yung tumatama, di lang center
+                    
+                    self.add_score()
+                    
+                    if bullet.color == enemy.color:
                         self._enemies[enemy.path_idx] = None
-                        self._bullets.remove(bullet)
+                    self._bullets.remove(bullet)
     
     def update_enemies(self):
         new_enemies: list[Enemy | None] = [None] * len(self._enemies)
@@ -140,16 +150,13 @@ class ZumaTowerDefenceModel:
     @property
     def bullets(self):
         return self._bullets
-    
-    @property
-    def bullet_speed(self):
-        return self._bullet_speed
         
     def bullet_shot(self, mouse_x, mouse_y):
         if (pyxel.frame_count - self._last_bullet_shot) > 27: # 27 here is 0.9 of 30 frames, change to 50 once 60 fps
             self._bullets.append(
-                    Bullet(mouse_x, mouse_y, self._bullet_speed)
+                    Bullet(mouse_x, mouse_y, self._next_bullet_color)
                 )
+            self._next_bullet_color = self._rng.randint(14, 16) # pede to isepartae function since dalwang beses kinall
             self._last_bullet_shot = pyxel.frame_count
 
     def update_bullets(self):
@@ -159,10 +166,11 @@ class ZumaTowerDefenceModel:
     
 
 class Bullet:
-    def __init__(self, target_x: int, target_y: int, speed: float):
+    def __init__(self, target_x: int, target_y: int, color: int):
         self._current_x = 128.0
         self._current_y = 128.0 # input the center here if binago size ng screen
-        self._speed = speed
+        self._speed = 5
+        self._color = color
 
         dir_x = target_x - 128
         dir_y = target_y - 128 # input new center here if ever
@@ -185,6 +193,10 @@ class Bullet:
     def bullet_y(self) -> float:
         return self._current_y
     
+    @property
+    def color(self):
+        return self._color
+    
     def update(self):
         self._current_x += self._dx
         self._current_y += self._dy
@@ -193,11 +205,12 @@ class Bullet:
         return 0 <= self._current_x <= 261 or 0 <= self._current_y <= 261 # 261 para off screen mawala
 
 class Enemy:
-    def __init__(self, enemy_coords, enemy_path):       
+    def __init__(self, enemy_coords, enemy_path, color: int):       
         self._enemy_path_idx = 0
         self._side = 15
         self._enemy_coords = enemy_coords
         self._enemy_path = enemy_path
+        self._color = color
 
         # color can be added here
     
@@ -218,6 +231,10 @@ class Enemy:
     @property
     def side(self):
         return self._side
+    
+    @property
+    def color(self):
+        return self._color
 
     def update(self):
         if not pyxel.frame_count == 0 and pyxel.frame_count % 60 == 0:

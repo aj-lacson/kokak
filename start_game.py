@@ -1,9 +1,10 @@
 from model import ZumaTowerDefenceModel
 from view import ZumaTowerDefenceView
 from controller import ZumaTowerDefenceController
+from random import Random
 
 def main():
-    model = ZumaTowerDefenceModel()
+    model = ZumaTowerDefenceModel(Random())
     view = ZumaTowerDefenceView()
     controller = ZumaTowerDefenceController(model, view)
     
