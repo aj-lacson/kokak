@@ -12,8 +12,8 @@ class ZumaTowerDefenceView:
         ...
     
     def start_game(self, update_fn, draw_fn):
-        self._width = 382
-        self._height = 256
+        self._width = 400
+        self._height = 272
         pyxel.init(self._width, self._height)
         pyxel.mouse(True)
         pyxel.run(update_fn, draw_fn)
@@ -31,11 +31,22 @@ class ZumaTowerDefenceView:
                 (241 <= pyxel.mouse_y <= 255) and \
                 pyxel.btnp(pyxel.MOUSE_BUTTON_LEFT)
     
+    def upgrade_tower_click(self):
+        return (257 <= pyxel.mouse_x <= 272) and \
+                (257 <= pyxel.mouse_y <= 272) and \
+                pyxel.btnp(pyxel.MOUSE_BUTTON_LEFT)
+    
     def coords_pos(self) -> tuple[int, int]:
         return (pyxel.mouse_x, pyxel.mouse_y)
     
     def draw_add_tower_button(self):
         pyxel.rect(241, 241, 15, 15, 2)
+    
+    def draw_mouse_coords(self):
+        pyxel.text(200, 200, f"x: {pyxel.mouse_x} y: {pyxel.mouse_y}", 15)
+
+    def draw_upgrade_tower_button(self):
+        pyxel.rect(257, 257, 15, 15, 2)
     
     # pag pinindot tower, may upgrade button lalabs
     
@@ -45,7 +56,7 @@ class ZumaTowerDefenceView:
         
     def draw_bullet(self, bullets):
         for bullet in bullets:
-            pyxel.circ(int(bullet.bullet_x), int(bullet.bullet_y), 5, bullet.color)
+            pyxel.circ(int(bullet.bullet_x), int(bullet.bullet_y), 2, bullet.color)
     
     def draw_enemy(self, enemies):
         for enemy in enemies:

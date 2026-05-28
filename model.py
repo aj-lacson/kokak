@@ -1,12 +1,10 @@
 import math
 import pyxel
-import json
 from random import Random
 
 class ZumaTowerDefenceModel:
-    def __init__(self, rng: Random):
-        with open('settings.json', 'r') as file:
-            self._data = json.load(file)
+    def __init__(self, rng: Random, data):
+        self._data = data["standard"]
 
         # game
         self._fps = 30
@@ -14,7 +12,7 @@ class ZumaTowerDefenceModel:
         self._game_tile_coords = {}
         self._current_round: int = 0
         self._rounds: int = self._data["rounds"]
-        self._score = 0
+        self._score = 10
         self._rng = rng
         self._colors = self._data["colors-available"]
         
@@ -24,19 +22,19 @@ class ZumaTowerDefenceModel:
         # enemy
         self._enemy_count: int = self._data["enemies-per-round"]
         self._enemies_spawned: int = 0
-        self._enemy_path: list = self._data["map-sequence"] # 0 is reserved for -15, offscreen spawning
+        self._enemy_path: list = self._data["map-sequence"]
         self._enemies: list[Enemy | None] = [None] * len(self._enemy_path) # physics of disconnected enemy in front not moving
 
         # tower
-        self._towers: list[Tower] = []
+        self._towers: list[Tower | None] = []
         self._towered_tiles = {}
         self._unavailable_tower_tiles = self._enemy_path[:]
+        self._tower_next_bullet_color = self._rng.randint(16 - self._colors, 15)
 
         # bullet
         self._bullets: list[Bullet] = []
         self._last_bullet_shot: int = 0
         self._next_bullet_color = self._rng.randint(16 - self._colors, 15)
-        self._next_tower_bullet_color = self._rng.randint(16 - self._colors, 15)
 
         self.tile_number_generator()
     
@@ -80,10 +78,19 @@ class ZumaTowerDefenceModel:
         tile_size = 16 # please change it to whatever max size screen (one side) you have divided by 16
         tile_number = 0
 
-        for y in range(1, 256, tile_size):
-            for x in range(-15 if tile_number == 0 else 1, 256, tile_size):
+        for y in range(1, 384, tile_size):
+            for x in range(1, 256, tile_size):
                 self._game_tile_coords[tile_number] = (x, y)
                 tile_number += 1
+    
+    def get_tile(self, mouse_pos):
+        mouse_pos_x, mouse_pos_y = mouse_pos
+        
+        tile_col = (mouse_pos_x - 1) // 16
+        tile_row = (mouse_pos_y - 1) // 16
+        tile = (tile_row * 16) + tile_col
+
+        return tile
     
     '''# player properties and methods'''
 
@@ -101,54 +108,47 @@ class ZumaTowerDefenceModel:
                 self._player_lives -= 1
                 self._enemies[enemy.path_idx] = None
                 break
-    
+              
     '''# tower properties and methods'''
     def add_tower(self, mouse_pos):
-        mouse_pos_x, mouse_pos_y = mouse_pos
-        tile_pos = -1
         
         if self._score < 5:
             return
         
-        for key in self._game_tile_coords:
-            coord_x, coord_y = self._game_tile_coords[key]
-            if (key not in self._unavailable_tower_tiles) and \
-                (coord_x <= mouse_pos_x < coord_x + 16) and \
-                (coord_y <= mouse_pos_y < coord_y + 16):
-                tile_pos = key
-                
-                self._towered_tiles[key] = (coord_x, coord_y)
-                self._unavailable_tower_tiles += [tile_pos]
-                
-                self._score -= 5
-                break
+        tile = self.get_tile(mouse_pos)
 
-        if tile_pos == -1:
+        if tile not in self._game_tile_coords:
             return
 
-        self._towers.append(Tower(tile_pos, self._game_tile_coords))
+        coord_x, coord_y = self._game_tile_coords[tile]
+        if tile not in self._unavailable_tower_tiles:
+            
+            self._towered_tiles[tile] = (coord_x, coord_y)
+            self._unavailable_tower_tiles += [tile]
+            
+            self._score -= 5
+
+            self._towers.append(Tower(tile, self._game_tile_coords))
     
-    def upgrade_tower(self, tower_tile): # upgrade tower
-            ...
+    def upgrade_tower(self, mouse_pos): # upgrade tower
+        if self._score < 5:
+            return
+        tile = self.get_tile(mouse_pos)
+
+        tower = next((tower for tower in self._towers if tower and tower.tile == tile), None)
+        if tower:
+            tower.upgrade()
+            self._score -= 5
+        
 
     def tower_clicked(self, mouse_pos): # a upgrade button will pop up beside the tower
-        mouse_pos_x, mouse_pos_y = mouse_pos
-
-        if not self._towered_tiles:
-            return False
-        
-        for key in self._towered_tiles:
-            coord_x, coord_y = self._towered_tiles[key]
-
-            if (coord_x <= mouse_pos_x < coord_x + 16) and \
-                (coord_y <= mouse_pos_y < coord_y + 16):
-                
-                return True
-        return False
+        tile = self.get_tile(mouse_pos)
+        return tile in self._towered_tiles
     
     def tower_shoot(self):
         for tower in self._towers:
-            self.bullet_shot(tower.x + 7, tower.y + 7, tower.x + 7, tower.y, tower.firerate)
+            if tower:
+                tower.bullet_shot(self) if tower.level == 1 else tower.bullet_shot_two(self)
 
     @property
     def towers(self):
@@ -222,7 +222,7 @@ class ZumaTowerDefenceModel:
                 )
             self._next_bullet_color = self._rng.randint(14, 15) # pede to isepartae function since dalwang beses kinall
             self._last_bullet_shot = pyxel.frame_count
-
+    
     def update_bullets(self):
         for bullet in self._bullets:
             bullet.update()
@@ -232,12 +232,13 @@ class ZumaTowerDefenceModel:
 class Bullet:
     def __init__(self, current_x, current_y, target_x: int, target_y: int, color: int):
         self._current_x = current_x
-        self._current_y = current_y # input the center here if binago size ng screen
+        self._current_y = current_y
         self._speed = 10
         self._color = color
+        
 
         dir_x = target_x - current_x
-        dir_y = target_y - current_y # input new center here if ever
+        dir_y = target_y - current_y
         length = math.hypot(dir_x, dir_y)
 
         if length == 0:
@@ -307,10 +308,20 @@ class Tower:
         self._tile_pos = tile_pos
         self._tower_coords = game_tile_coords
         self._firerate = 60
+        self._last_bullet_shot = 0
+        self._level = 1
     
+    @property
+    def tile(self):
+        return self._tile_pos
+
     @property
     def x(self):
         return self._tower_coords[self._tile_pos][0]
+    
+    @property
+    def level(self):
+        return self._level
     
     @property
     def y(self):
@@ -319,3 +330,28 @@ class Tower:
     @property
     def firerate(self):
         return self._firerate
+    
+    @property
+    def last_bullet_shot(self):
+        return self._last_bullet_shot
+    
+    def upgrade(self):
+        self._level = 2
+    
+    def set_last_bullet_shot(self, last_bullet_shot):
+        self._last_bullet_shot = last_bullet_shot
+
+    def bullet_shot(self, model):
+        if (pyxel.frame_count - self._last_bullet_shot) > self._firerate:
+            
+            model._bullets.append(Bullet(self.x + 7, self.y + 7, self.x + 7, self.y, model._tower_next_bullet_color))
+
+            model._tower_next_bullet_color = model._rng.randint(16 - model._colors, 15)
+            self._last_bullet_shot = pyxel.frame_count
+    
+    def bullet_shot_two(self, model):
+        if (pyxel.frame_count - self._last_bullet_shot) > self._firerate:
+            for adjustment in range(4, 12, 7):
+                model._bullets.append(Bullet(self.x + adjustment, self.y + adjustment, self.x + adjustment, self.y, model._tower_next_bullet_color))
+                model._tower_next_bullet_color = model._rng.randint(16 - model._colors, 15)
+            self._last_bullet_shot = pyxel.frame_count

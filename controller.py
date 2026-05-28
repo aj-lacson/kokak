@@ -7,6 +7,7 @@ class ZumaTowerDefenceController:
         self._model = model
         self._view = view
         self._tower_placement_mode = False
+        self._upgrade_tower_mode = False
     
     def start_game(self):
         self._view.start_game(self.update, self.draw)
@@ -33,8 +34,14 @@ class ZumaTowerDefenceController:
                     if view.shooting_click():
                         model.add_tower(view.coords_pos())
                         self._tower_placement_mode = False
+                elif self._upgrade_tower_mode:
+                    if model.tower_clicked(view.coords_pos()):
+                        model.upgrade_tower(view.coords_pos())
+                        self._upgrade_tower_mode = False
                 elif view.add_tower_click():
                     self._tower_placement_mode = True
+                elif view.upgrade_tower_click():
+                    self._upgrade_tower_mode = True
                     
         
     def draw(self):
@@ -48,6 +55,7 @@ class ZumaTowerDefenceController:
         view.draw_hearts(model.player_lives)
         view.draw_rounds(model.current_round)
         view.draw_paths(model.enemy_coords, model.enemy_path)
+        view.draw_mouse_coords()
 
         # entities
         view.draw_bullet(model.bullets)
@@ -58,4 +66,5 @@ class ZumaTowerDefenceController:
         # buttons
         if not model.round_ongoing and not model.is_game_over:
             view.draw_add_tower_button()
+            view.draw_upgrade_tower_button()
 

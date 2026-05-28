@@ -1,13 +1,18 @@
 {
- "player-lives":   2,
+ "standard": {"player-lives":   2,
  "map-sequence": [0, 1, 17, 33, 49, 50, 51, 52, 53, 37, 21, 22, 23, 24],
+ "tunneled-tiles": [],
  
- "rounds": 3, 
+ "rounds": 12, 
  "enemies-per-round": 5,
 
  "colors-available": 2,
  
  "add-tower-cost": 5,
- "upgade-tower-cost": 10
+ "upgade-tower-cost": 5,
+ "game-width": 400,
+ "game-height": 272},
+
+ "Endless": {}
  
 }
