@@ -9,10 +9,14 @@ class ZumaTowerDefenceModel:
             self._data = json.load(file)
 
         # game
+        self._fps = 30
+        self._return_game_frame = 0
+        self._game_tile_coords = {}
         self._current_round: int = 0
         self._rounds: int = self._data["rounds"]
         self._score = 0
         self._rng = rng
+        self._colors = self._data["colors-available"]
         
         # player
         self._player_lives: int = self._data["player-lives"]
@@ -20,14 +24,19 @@ class ZumaTowerDefenceModel:
         # enemy
         self._enemy_count: int = self._data["enemies-per-round"]
         self._enemies_spawned: int = 0
-        self._enemy_path: list = [0, 1, 17, 33, 49, 50, 51, 52, 53, 37, 21, 22, 23, 24] # 0 is reserved for -15, offscreen spawning
-        self._enemies: list[Enemy | None] = [None] * len(self._enemy_path)
-        self._enemy_coords = {}
-        
+        self._enemy_path: list = self._data["map-sequence"] # 0 is reserved for -15, offscreen spawning
+        self._enemies: list[Enemy | None] = [None] * len(self._enemy_path) # physics of disconnected enemy in front not moving
+
+        # tower
+        self._towers: list[Tower] = []
+        self._towered_tiles = {}
+        self._unavailable_tower_tiles = self._enemy_path[:]
+
         # bullet
         self._bullets: list[Bullet] = []
         self._last_bullet_shot: int = 0
-        self._next_bullet_color= self._rng.randint(14, 16)
+        self._next_bullet_color = self._rng.randint(16 - self._colors, 15)
+        self._next_tower_bullet_color = self._rng.randint(16 - self._colors, 15)
 
         self.tile_number_generator()
     
@@ -44,12 +53,17 @@ class ZumaTowerDefenceModel:
         if round_over and self._enemies_spawned == self._enemy_count:
             self._enemies_spawned = 0
             self._current_round += 1
+            self._return_game_frame = (pyxel.frame_count + 180) # 10 secs yung in between rounds
             return True
         return False
     
     @property
     def rounds(self) -> int:
         return self._rounds
+    
+    @property
+    def round_ongoing(self):
+        return pyxel.frame_count > self._return_game_frame
     
     @property
     def current_round(self) -> int:
@@ -68,7 +82,7 @@ class ZumaTowerDefenceModel:
 
         for y in range(1, 256, tile_size):
             for x in range(-15 if tile_number == 0 else 1, 256, tile_size):
-                self._enemy_coords[tile_number] = (x, y)
+                self._game_tile_coords[tile_number] = (x, y)
                 tile_number += 1
     
     '''# player properties and methods'''
@@ -88,6 +102,57 @@ class ZumaTowerDefenceModel:
                 self._enemies[enemy.path_idx] = None
                 break
     
+    '''# tower properties and methods'''
+    def add_tower(self, mouse_pos):
+        mouse_pos_x, mouse_pos_y = mouse_pos
+        tile_pos = -1
+        
+        if self._score < 5:
+            return
+        
+        for key in self._game_tile_coords:
+            coord_x, coord_y = self._game_tile_coords[key]
+            if (key not in self._unavailable_tower_tiles) and \
+                (coord_x <= mouse_pos_x < coord_x + 16) and \
+                (coord_y <= mouse_pos_y < coord_y + 16):
+                tile_pos = key
+                
+                self._towered_tiles[key] = (coord_x, coord_y)
+                self._unavailable_tower_tiles += [tile_pos]
+                
+                self._score -= 5
+                break
+
+        if tile_pos == -1:
+            return
+
+        self._towers.append(Tower(tile_pos, self._game_tile_coords))
+    
+    def upgrade_tower(self, tower_tile): # upgrade tower
+            ...
+
+    def tower_clicked(self, mouse_pos): # a upgrade button will pop up beside the tower
+        mouse_pos_x, mouse_pos_y = mouse_pos
+
+        if not self._towered_tiles:
+            return False
+        
+        for key in self._towered_tiles:
+            coord_x, coord_y = self._towered_tiles[key]
+
+            if (coord_x <= mouse_pos_x < coord_x + 16) and \
+                (coord_y <= mouse_pos_y < coord_y + 16):
+                
+                return True
+        return False
+    
+    def tower_shoot(self):
+        for tower in self._towers:
+            self.bullet_shot(tower.x + 7, tower.y + 7, tower.x + 7, tower.y, tower.firerate)
+
+    @property
+    def towers(self):
+        return self._towers
     
     '''# enemy properties and methods'''
     
@@ -109,13 +174,13 @@ class ZumaTowerDefenceModel:
     
     @property
     def enemy_coords(self):
-        return self._enemy_coords
+        return self._game_tile_coords
     
     def append_enemy(self):
         if self._enemies[0] is None and \
             self._enemies_spawned < self._enemy_count:
 
-            self._enemies[0] = Enemy(self._enemy_coords, self._enemy_path, self._rng.randint(14, 16))
+            self._enemies[0] = Enemy(self._game_tile_coords, self._enemy_path, self._rng.randint(16 - self._colors, 15))
             self._enemies_spawned += 1
     
     def kill_enemy(self):
@@ -130,9 +195,8 @@ class ZumaTowerDefenceModel:
                 if (enemy_x <= bullet._current_x <= enemy_x + enemy.side) and \
                    (enemy_y <= bullet._current_y <= enemy_y + enemy.side): # update this so that yung hitbox ng bullet mismo yung tumatama, di lang center
                     
-                    self.add_score()
-                    
                     if bullet.color == enemy.color:
+                        self.add_score()
                         self._enemies[enemy.path_idx] = None
                     self._bullets.remove(bullet)
     
@@ -151,12 +215,12 @@ class ZumaTowerDefenceModel:
     def bullets(self):
         return self._bullets
         
-    def bullet_shot(self, mouse_x, mouse_y):
-        if (pyxel.frame_count - self._last_bullet_shot) > 27: # 27 here is 0.9 of 30 frames, change to 50 once 60 fps
+    def bullet_shot(self, starting_x, starting_y, mouse_x, mouse_y, firerate):
+        if (pyxel.frame_count - self._last_bullet_shot) > firerate: # 27 here is 0.9 of 30 frames, change to 50 once 60 fps
             self._bullets.append(
-                    Bullet(mouse_x, mouse_y, self._next_bullet_color)
+                    Bullet(starting_x, starting_y, mouse_x, mouse_y, self._next_bullet_color)
                 )
-            self._next_bullet_color = self._rng.randint(14, 16) # pede to isepartae function since dalwang beses kinall
+            self._next_bullet_color = self._rng.randint(14, 15) # pede to isepartae function since dalwang beses kinall
             self._last_bullet_shot = pyxel.frame_count
 
     def update_bullets(self):
@@ -166,14 +230,14 @@ class ZumaTowerDefenceModel:
     
 
 class Bullet:
-    def __init__(self, target_x: int, target_y: int, color: int):
-        self._current_x = 128.0
-        self._current_y = 128.0 # input the center here if binago size ng screen
-        self._speed = 5
+    def __init__(self, current_x, current_y, target_x: int, target_y: int, color: int):
+        self._current_x = current_x
+        self._current_y = current_y # input the center here if binago size ng screen
+        self._speed = 10
         self._color = color
 
-        dir_x = target_x - 128
-        dir_y = target_y - 128 # input new center here if ever
+        dir_x = target_x - current_x
+        dir_y = target_y - current_y # input new center here if ever
         length = math.hypot(dir_x, dir_y)
 
         if length == 0:
@@ -205,14 +269,12 @@ class Bullet:
         return 0 <= self._current_x <= 261 or 0 <= self._current_y <= 261 # 261 para off screen mawala
 
 class Enemy:
-    def __init__(self, enemy_coords, enemy_path, color: int):       
+    def __init__(self, game_tile_coords, enemy_path, color: int):       
         self._enemy_path_idx = 0
         self._side = 15
-        self._enemy_coords = enemy_coords
+        self._enemy_coords = game_tile_coords
         self._enemy_path = enemy_path
         self._color = color
-
-        # color can be added here
     
     @property
     def path_idx(self) -> int:
@@ -239,3 +301,21 @@ class Enemy:
     def update(self):
         if not pyxel.frame_count == 0 and pyxel.frame_count % 60 == 0:
             self._enemy_path_idx += 1
+
+class Tower:
+    def __init__(self, tile_pos, game_tile_coords):
+        self._tile_pos = tile_pos
+        self._tower_coords = game_tile_coords
+        self._firerate = 60
+    
+    @property
+    def x(self):
+        return self._tower_coords[self._tile_pos][0]
+    
+    @property
+    def y(self):
+        return self._tower_coords[self._tile_pos][1]
+
+    @property
+    def firerate(self):
+        return self._firerate

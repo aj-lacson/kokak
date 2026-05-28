@@ -12,19 +12,36 @@ class ZumaTowerDefenceView:
         ...
     
     def start_game(self, update_fn, draw_fn):
-        pyxel.init(256, 256)
+        self._width = 382
+        self._height = 256
+        pyxel.init(self._width, self._height)
         pyxel.mouse(True)
         pyxel.run(update_fn, draw_fn)
     
     def clear_screen(self):
         pyxel.cls(0)
     
+    '''# buttons'''
+    
     def shooting_click(self) -> bool:
         return pyxel.btnp(pyxel.MOUSE_BUTTON_LEFT)
     
+    def add_tower_click(self) -> bool:
+        return (241 <= pyxel.mouse_x <= 255) and \
+                (241 <= pyxel.mouse_y <= 255) and \
+                pyxel.btnp(pyxel.MOUSE_BUTTON_LEFT)
+    
+    def coords_pos(self) -> tuple[int, int]:
+        return (pyxel.mouse_x, pyxel.mouse_y)
+    
+    def draw_add_tower_button(self):
+        pyxel.rect(241, 241, 15, 15, 2)
+    
+    # pag pinindot tower, may upgrade button lalabs
+    
     '''# entities'''
     def draw_player(self, bullet_color):
-        pyxel.circ(128, 128, 10, bullet_color)
+        pyxel.circ(self._width // 2, self._height // 2, 10, bullet_color)
         
     def draw_bullet(self, bullets):
         for bullet in bullets:
@@ -35,15 +52,19 @@ class ZumaTowerDefenceView:
             if enemy:
                 pyxel.rect(int(enemy.x), int(enemy.y), int(enemy.side), int(enemy.side), enemy.color)
     
+    def draw_towers(self, towers):
+        for tower in towers:
+            pyxel.rect(int(tower.x), int(tower.y), 15, 15, 2)
+    
     '''# game environment'''
     def draw_score(self, score: str):
-        pyxel.text(215, 240, f"EXP: {score}", 2)
+        pyxel.text(15, 240, f"EXP: {score}", 2)
         
     def draw_hearts(self, hearts):
-        pyxel.text(215, 230, f"Hearts: {hearts}", 2)
+        pyxel.text(15, 230, f"Hearts: {hearts}", 2)
     
     def draw_rounds(self, round):
-        pyxel.text(215, 220, f"Rounds: {round}", 2)
+        pyxel.text(15, 220, f"Rounds: {round + 1}", 2)
 
     def draw_paths(self, enemy_coords, enemy_path):
         x_coord_extra = 0
