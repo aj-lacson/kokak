@@ -351,7 +351,7 @@ class Tower:
     
     def bullet_shot_two(self, model):
         if (pyxel.frame_count - self._last_bullet_shot) > self._firerate:
-            for adjustment in range(4, 12, 7):
-                model._bullets.append(Bullet(self.x + adjustment, self.y + adjustment, self.x + adjustment, self.y, model._tower_next_bullet_color))
+            for adjustment in range(1, 22, 20):
+                model._bullets.append(Bullet(self.x + 7, self.y + adjustment, self.x + 7, self.y, model._tower_next_bullet_color))
                 model._tower_next_bullet_color = model._rng.randint(16 - model._colors, 15)
             self._last_bullet_shot = pyxel.frame_count
